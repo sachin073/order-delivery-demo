@@ -1,6 +1,9 @@
 package com.challenge.restaurant.controller;
 
 import java.util.List;
+import java.util.function.Supplier;
+
+import javax.annotation.PostConstruct;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -26,6 +29,9 @@ import com.challenge.restaurant.service.OrderService;
 import com.challenge.restaurant.service.PersonService;
 import com.challenge.restaurant.utils.OrderValidationUtils;
 
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+
 /**
  * Created by sachin on 4/7/19.
  */
@@ -40,13 +46,29 @@ public class OrderController {
 	PersonService deliveryPersonService;
 
 	@Autowired
+	MeterRegistry registry;
+
+	@Autowired
 	OrderMapperService mapperService;
+
+	Gauge counter = null;
+	static int placeApiHits = 0;
+
+	@PostConstruct
+	public void init() {
+		counter = Gauge.builder("poll_counter", new Supplier<Number>() {
+
+			@Override
+			public Number get() {
+				return placeApiHits;
+			}
+		}).register(registry);
+	}
 
 	@PostMapping(path = "/order")
 	public ResponseEntity<OrderDetailsResponse> placeorder(@RequestBody OrderRequest order) {
-
+		placeApiHits++;
 		Order placedOrder = new Order(order.getItemName(), order.getCost());
-
 		orderService.createOrder(placedOrder);
 
 		return new ResponseEntity<>(mapperService.mapOrderDetails(placedOrder), HttpStatus.OK);
